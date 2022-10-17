@@ -1,0 +1,278 @@
+From d54cac285e0fc10515d9902808897799835877e9 Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Thu, 13 Jan 2022 12:43:57 -0600
+Subject: [PATCH 1/7] add new bluetooth permissions
+
+---
+ android/build.gradle                             | 2 +-
+ android/src/main/AndroidManifest.xml             | 9 +++++++--
+ example/android/app/build.gradle                 | 4 ++--
+ example/android/app/src/main/AndroidManifest.xml | 3 ++-
+ 4 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/android/build.gradle b/android/build.gradle
+index 082a0fe..c85a802 100644
+--- a/android/build.gradle
++++ b/android/build.gradle
+@@ -18,7 +18,7 @@ rootProject.allprojects {
+ }
+ apply plugin: 'com.android.library'
+ android {
+-    compileSdkVersion 30
++    compileSdkVersion 31
+     compileOptions {
+         sourceCompatibility JavaVersion.VERSION_1_8
+         targetCompatibility JavaVersion.VERSION_1_8
+diff --git a/android/src/main/AndroidManifest.xml b/android/src/main/AndroidManifest.xml
+index 3b5ff2f..55e6132 100644
+--- a/android/src/main/AndroidManifest.xml
++++ b/android/src/main/AndroidManifest.xml
+@@ -2,6 +2,11 @@
+   package="io.github.edufolly.flutterbluetoothserial">
+     <uses-permission android:name="android.permission.BLUETOOTH" />
+     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
++    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
++    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
++        android:usesPermissionFlags="neverForLocation" />
++    <uses-permission-sdk-23 android:name="android.permission.ACCESS_COARSE_LOCATION"
++        android:maxSdkVersion="30" />
++    <uses-permission-sdk-23 android:name="android.permission.ACCESS_FINE_LOCATION"
++        android:maxSdkVersion="30" />
+ </manifest>
+diff --git a/example/android/app/build.gradle b/example/android/app/build.gradle
+index 4b7eba1..e39d192 100644
+--- a/example/android/app/build.gradle
++++ b/example/android/app/build.gradle
+@@ -15,7 +15,7 @@ apply plugin: 'com.android.application'
+ apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+ 
+ android {
+-    compileSdkVersion 30
++    compileSdkVersion 31
+     lintOptions {
+         disable 'InvalidPackage'
+     }
+@@ -23,7 +23,7 @@ android {
+         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+         applicationId "io.github.edufolly.flutterbluetoothserialexample"
+         minSdkVersion 19
+-        targetSdkVersion 30
++        targetSdkVersion 31
+         versionCode 1
+         versionName "1.0"
+         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+diff --git a/example/android/app/src/main/AndroidManifest.xml b/example/android/app/src/main/AndroidManifest.xml
+index bae56f3..e46d270 100644
+--- a/example/android/app/src/main/AndroidManifest.xml
++++ b/example/android/app/src/main/AndroidManifest.xml
+@@ -21,7 +21,8 @@
+             android:theme="@style/LaunchTheme"
+             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density"
+             android:hardwareAccelerated="true"
+-            android:windowSoftInputMode="adjustResize">
++            android:windowSoftInputMode="adjustResize"
++            android:exported="true">
+             <intent-filter>
+                 <action android:name="android.intent.action.MAIN"/>
+                 <category android:name="android.intent.category.LAUNCHER"/>
+
+From 649684311f944dbe37291072415f4b266a845b6f Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Thu, 13 Jan 2022 14:50:44 -0600
+Subject: [PATCH 2/7] Add Bluetooth Scan Permissions request
+
+---
+ .../FlutterBluetoothSerialPlugin.java         | 37 ++++++++++++++-----
+ 1 file changed, 28 insertions(+), 9 deletions(-)
+
+diff --git a/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java b/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
+index 0b9686b..77cf907 100644
+--- a/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
++++ b/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
+@@ -50,6 +50,7 @@ public class FlutterBluetoothSerialPlugin implements FlutterPlugin, ActivityAwar
+ 
+     // Permissions and request constants
+     private static final int REQUEST_COARSE_LOCATION_PERMISSIONS = 1451;
++    private static final int REQUEST_BLUETOOTH_SCAN_PERMISSIONS = 1991;
+     private static final int REQUEST_ENABLE_BLUETOOTH = 1337;
+     private static final int REQUEST_DISCOVERABLE_BLUETOOTH = 2137;
+ 
+@@ -412,6 +413,10 @@ public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
+                             pendingPermissionsEnsureCallbacks.onResult(grantResults[0] == PackageManager.PERMISSION_GRANTED);
+                             pendingPermissionsEnsureCallbacks = null;
+                             return true;
++                        case REQUEST_BLUETOOTH_SCAN_PERMISSIONS:
++                            pendingPermissionsEnsureCallbacks.onResult(grantResults[0] == PackageManager.PERMISSION_GRANTED);
++                            pendingPermissionsEnsureCallbacks = null;
++                            return true;
+                     }
+                     return false;
+                 }
+@@ -444,20 +449,34 @@ private interface EnsurePermissionsCallback {
+     EnsurePermissionsCallback pendingPermissionsEnsureCallbacks = null;
+ 
+     private void ensurePermissions(EnsurePermissionsCallback callbacks) {
+-        if (
++        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S) {
++            if (
+                 ContextCompat.checkSelfPermission(activity,
+-                        Manifest.permission.ACCESS_COARSE_LOCATION)
+-                        != PackageManager.PERMISSION_GRANTED
+-                        || ContextCompat.checkSelfPermission(activity,
+-                        Manifest.permission.ACCESS_FINE_LOCATION)
+-                        != PackageManager.PERMISSION_GRANTED) {
+-            ActivityCompat.requestPermissions(activity,
++                    Manifest.permission.ACCESS_COARSE_LOCATION)
++                    != PackageManager.PERMISSION_GRANTED
++                    || ContextCompat.checkSelfPermission(activity,
++                    Manifest.permission.ACCESS_FINE_LOCATION)
++                    != PackageManager.PERMISSION_GRANTED) {
++                ActivityCompat.requestPermissions(activity,
+                     new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION},
+                     REQUEST_COARSE_LOCATION_PERMISSIONS);
+ 
+-            pendingPermissionsEnsureCallbacks = callbacks;
++                pendingPermissionsEnsureCallbacks = callbacks;
++            } else {
++                callbacks.onResult(true);
++            }
+         } else {
+-            callbacks.onResult(true);
++            if (
++                ContextCompat.checkSelfPermission(activity,
++                    Manifest.permission.BLUETOOTH_SCAN)
++                    != PackageManager.PERMISSION_GRANTED) {
++                ActivityCompat.requestPermissions(activity,
++                    new String[]{Manifest.permission.BLUETOOTH_SCAN},
++                    REQUEST_BLUETOOTH_SCAN_PERMISSIONS);
++                pendingPermissionsEnsureCallbacks = callbacks;
++            } else {
++                callbacks.onResult(true);
++            }
+         }
+     }
+ 
+
+From cce8c4374c5e47661143c4f34ace42d3559dd721 Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Thu, 13 Jan 2022 14:56:07 -0600
+Subject: [PATCH 3/7] also need Bluetooth Connect permission
+
+---
+ .../flutterbluetoothserial/FlutterBluetoothSerialPlugin.java    | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java b/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
+index 77cf907..8b25404 100644
+--- a/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
++++ b/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
+@@ -471,7 +471,7 @@ private void ensurePermissions(EnsurePermissionsCallback callbacks) {
+                     Manifest.permission.BLUETOOTH_SCAN)
+                     != PackageManager.PERMISSION_GRANTED) {
+                 ActivityCompat.requestPermissions(activity,
+-                    new String[]{Manifest.permission.BLUETOOTH_SCAN},
++                    new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT},
+                     REQUEST_BLUETOOTH_SCAN_PERMISSIONS);
+                 pendingPermissionsEnsureCallbacks = callbacks;
+             } else {
+
+From 96aef4da2597a22446bcabb14f145eede689b927 Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Thu, 13 Jan 2022 15:02:34 -0600
+Subject: [PATCH 4/7] fix permission check logic
+
+---
+ .../flutterbluetoothserial/FlutterBluetoothSerialPlugin.java   | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java b/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
+index 8b25404..c85af25 100644
+--- a/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
++++ b/android/src/main/java/io/github/edufolly/flutterbluetoothserial/FlutterBluetoothSerialPlugin.java
+@@ -469,6 +469,9 @@ private void ensurePermissions(EnsurePermissionsCallback callbacks) {
+             if (
+                 ContextCompat.checkSelfPermission(activity,
+                     Manifest.permission.BLUETOOTH_SCAN)
++                    != PackageManager.PERMISSION_GRANTED
++                    || ContextCompat.checkSelfPermission(activity,
++                    Manifest.permission.BLUETOOTH_CONNECT)
+                     != PackageManager.PERMISSION_GRANTED) {
+                 ActivityCompat.requestPermissions(activity,
+                     new String[]{Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT},
+
+From e4117d22056f35908c0bf688b8ed7f849a03f9fd Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Tue, 25 Jan 2022 21:08:41 -0600
+Subject: [PATCH 5/7] fix permission types
+
+---
+ android/src/main/AndroidManifest.xml | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/android/src/main/AndroidManifest.xml b/android/src/main/AndroidManifest.xml
+index 55e6132..6d03c4c 100644
+--- a/android/src/main/AndroidManifest.xml
++++ b/android/src/main/AndroidManifest.xml
+@@ -5,8 +5,8 @@
+     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+         android:usesPermissionFlags="neverForLocation" />
+-    <uses-permission-sdk-23 android:name="android.permission.ACCESS_COARSE_LOCATION"
++    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
+         android:maxSdkVersion="30" />
+-    <uses-permission-sdk-23 android:name="android.permission.ACCESS_FINE_LOCATION"
++    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+         android:maxSdkVersion="30" />
+ </manifest>
+
+From c0bd993f993e736c19f36a0aef8dd8bcd019dfd5 Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Wed, 26 Jan 2022 00:33:38 -0600
+Subject: [PATCH 6/7] remove max sdk from permission to avoid conflicts with
+ other packages that need location
+
+---
+ android/src/main/AndroidManifest.xml | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/android/src/main/AndroidManifest.xml b/android/src/main/AndroidManifest.xml
+index 6d03c4c..e8057ab 100644
+--- a/android/src/main/AndroidManifest.xml
++++ b/android/src/main/AndroidManifest.xml
+@@ -5,8 +5,6 @@
+     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+         android:usesPermissionFlags="neverForLocation" />
+-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
+-        android:maxSdkVersion="30" />
+-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+-        android:maxSdkVersion="30" />
++    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
++    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+ </manifest>
+
+From 4c0679a4a57355380207f4b5df8ac144987a46a1 Mon Sep 17 00:00:00 2001
+From: Rick Casson <4932864+rickcasson@users.noreply.github.com>
+Date: Tue, 17 May 2022 10:38:43 -0700
+Subject: [PATCH 7/7] add max sdk for old permissions
+
+---
+ android/src/main/AndroidManifest.xml | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/android/src/main/AndroidManifest.xml b/android/src/main/AndroidManifest.xml
+index e8057ab..1d09232 100644
+--- a/android/src/main/AndroidManifest.xml
++++ b/android/src/main/AndroidManifest.xml
+@@ -1,7 +1,7 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+   package="io.github.edufolly.flutterbluetoothserial">
+-    <uses-permission android:name="android.permission.BLUETOOTH" />
+-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
++    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
++    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+         android:usesPermissionFlags="neverForLocation" />
